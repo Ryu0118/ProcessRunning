@@ -69,11 +69,11 @@ import Testing
 @testable import ProcessRunning
 
 @Test func testMyService() async throws {
-    let mockRunner = MockProcessRunner() // あなたが好きなように実装して
+    let mockRunner = MockProcessRunner() // Implement as needed
     let service = MyService(processRunner: mockRunner)
 
     try await service.foo()
     
-    // あなたが好きなようにassertionして
+    // Add assertions as needed
 }
 ```
