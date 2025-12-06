@@ -59,21 +59,3 @@ let service = MyService(processRunner: ProcessRunner())
 // Test code
 let service = MyService(processRunner: MockProcessRunner())
 ```
-
-### Testing
-
-Create a mock implementation for testing:
-
-```swift
-import Testing
-@testable import ProcessRunning
-
-@Test func testMyService() async throws {
-    let mockRunner = MockProcessRunner() // Implement as needed
-    let service = MyService(processRunner: mockRunner)
-
-    try await service.foo()
-    
-    // Add assertions as needed
-}
-```
