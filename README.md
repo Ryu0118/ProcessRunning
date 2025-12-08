@@ -12,7 +12,7 @@ swift-subprocess provides a great API for running subprocesses, but it's not eas
 ## Installation
 
 ```swift
-.package(url: "https://github.com/yourusername/ProcessRunning.git", from: "0.1.0")
+.package(url: "https://github.com/Ryu0118/ProcessRunning.git", from: "0.1.0")
 ```
 
 ## Usage
