@@ -176,10 +176,6 @@ struct ProcessRunningProtocolTests {
                 let result = try await runner.run(
                     .name("echo"),
                     arguments: [message],
-                    environment: .inherit,
-                    workingDirectory: nil,
-                    platformOptions: PlatformOptions(),
-                    input: .none,
                     output: .string(limit: 1024),
                     error: .string(limit: 0, encoding: Unicode.UTF8.self)
                 )

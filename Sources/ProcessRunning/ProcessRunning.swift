@@ -6,13 +6,9 @@ import System
 import SystemPackage
 #endif
 
-// MARK: - ProcessRunning Protocol
-
 /// A protocol that defines all Subprocess APIs for dependency injection
 /// Based on Subprocess version 0.2.1
 public protocol ProcessRunning: Sendable {
-    // MARK: - Basic run methods with CollectedResult
-
     /// Run an executable with given parameters asynchrously and returns
     /// a `CollectedResult` containing the output of the child process.
     func run<Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
@@ -25,8 +21,6 @@ public protocol ProcessRunning: Sendable {
         output: Output,
         error: Error
     ) async throws -> any CollectedResultProtocol<Output, Error>
-
-    // MARK: - Closure-based run methods with custom execution body
 
     /// Run an executable with given parameters and a custom closure
     /// to manage the running subprocess' lifetime.
@@ -72,8 +66,6 @@ public protocol ProcessRunning: Sendable {
         body: ((Execution, StandardInputWriter, AsyncBufferSequence) async throws -> Result)
     ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void
 
-    // MARK: - Configuration-based run methods
-
     /// Run a `Configuration` asynchrously and returns
     /// a `CollectedResult` containing the output of the child process.
     func run<Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
@@ -93,6 +85,26 @@ public protocol ProcessRunning: Sendable {
         isolation: isolated (any Actor)?,
         body: ((Execution) async throws -> Result)
     ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void
+
+    /// Run an executable with given parameters asynchronously and return a
+    /// collected result that contains the output of the child process.
+    /// - Parameters:
+    ///   - executable: The executable to run.
+    /// - Returns: a `CollectedResult` containing the result of the run.
+    func run(
+        _ executable: Executable
+    ) async throws -> any CollectedResultProtocol<DiscardedOutput, DiscardedOutput>
+
+    /// Run an executable with given parameters asynchronously and return a
+    /// collected result that contains the output of the child process.
+    /// - Parameters:
+    ///   - executable: The executable to run.
+    ///   - arguments: The arguments to pass to the executable.
+    /// - Returns: a `CollectedResult` containing the result of the run.
+    func run(
+        _ executable: Executable,
+        arguments: Arguments
+    ) async throws -> any CollectedResultProtocol<DiscardedOutput, DiscardedOutput>
 
     /// Run an executable with given parameters asynchronously and return a
     /// collected result that contains the output of the child process.
@@ -706,10 +718,37 @@ public protocol ProcessRunning: Sendable {
     ) async throws -> any ExecutionResultProtocol<Result>
 }
 
-// MARK: - ProcessRunning Default Implementations
-
 extension ProcessRunning {
-    // MARK: - CollectedResult convenience methods
+    public func run(
+        _ executable: Executable
+    ) async throws -> any CollectedResultProtocol<DiscardedOutput, DiscardedOutput> {
+        try await self.run(
+            executable,
+            arguments: [],
+            environment: .inherit,
+            workingDirectory: nil,
+            platformOptions: PlatformOptions(),
+            input: .none,
+            output: .discarded,
+            error: .discarded
+        )
+    }
+
+    public func run(
+        _ executable: Executable,
+        arguments: Arguments
+    ) async throws -> any CollectedResultProtocol<DiscardedOutput, DiscardedOutput> {
+        try await self.run(
+            executable,
+            arguments: arguments,
+            environment: .inherit,
+            workingDirectory: nil,
+            platformOptions: PlatformOptions(),
+            input: .none,
+            output: .discarded,
+            error: .discarded
+        )
+    }
 
     public func run<Output: OutputProtocol>(
         _ executable: Executable,
@@ -888,8 +927,6 @@ extension ProcessRunning {
         )
     }
 
-    // MARK: - ExecutionResult convenience methods with body
-
     public func run<Result>(
         _ executable: Executable,
         body: ((Execution) async throws -> Result)
@@ -1025,8 +1062,6 @@ extension ProcessRunning {
             body: body
         )
     }
-
-    // MARK: - ExecutionResult convenience methods with AsyncBufferSequence
 
     public func run<Result>(
         _ executable: Executable,
@@ -1242,8 +1277,6 @@ extension ProcessRunning {
         )
     }
 
-    // MARK: - ExecutionResult convenience methods with StandardInputWriter
-
     public func run<Result>(
         _ executable: Executable,
         body: ((Execution, StandardInputWriter, AsyncBufferSequence) async throws -> Result)
@@ -1446,8 +1479,6 @@ extension ProcessRunning {
             body: body
         )
     }
-
-    // MARK: - Configuration-based convenience methods
 
     public func run<Output: OutputProtocol>(
         _ configuration: Configuration,
