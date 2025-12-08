@@ -91,15 +91,11 @@ struct ProcessRunningProtocolTests {
             recordCall(executable, arguments)
             // Use actual Subprocess.run to get a real CollectedResult
             // This is acceptable for a mock that needs to return the protocol type
-            return try MockCollectedResult(
+            return MockCollectedResult(
                 processIdentifier: .init(value: 0),
-                terminationStatus: .exited(0),
-                standardOutput: output.output(from: .init()),
-                standardError: error.output(from: .init())
+                terminationStatus: .exited(0)
             )
         }
-
-        // MARK: - Closure-based run methods with custom execution body
 
         func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
             _ executable: Executable,
@@ -172,29 +168,22 @@ struct ProcessRunningProtocolTests {
         struct CommandService {
             let runner: any ProcessRunning
 
-            func echo(_ message: String) async throws -> String? {
-                let result = try await runner.run(
-                    .name("echo"),
-                    arguments: [message],
-                    environment: .inherit,
-                    workingDirectory: nil,
-                    platformOptions: PlatformOptions(),
-                    input: .none,
-                    output: .string(limit: 1024),
-                    error: .string(limit: 0, encoding: Unicode.UTF8.self)
+            func ls(_ dir: String) async throws {
+                let _ = try await runner.run(
+                    .name("ls"),
+                    arguments: [dir]
                 )
-                return result.standardOutput?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             }
         }
 
         let mock = MockProcessRunner()
         let service = CommandService(runner: mock)
 
-        let _ = try await service.echo("Hello Mock")
+        try await service.ls(".")
 
         let calls = await mock.calls
         #expect(calls.count == 1)
-        #expect(calls[0].executable == .name("echo"))
-        #expect(calls[0].arguments == ["Hello Mock"])
+        #expect(calls[0].executable == .name("ls"))
+        #expect(calls[0].arguments == ["."])
     }
 }
