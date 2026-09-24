@@ -22,8 +22,7 @@ struct ProcessRunnerTests {
         )
 
         #expect(result.terminationStatus.isSuccess)
-        #expect(result.standardOutput != nil)
-        #expect(!result.standardOutput!.isEmpty)
+        #expect(!result.standardOutput.isEmpty)
     }
 
     @Test("ProcessRunner can execute echo command with input")
@@ -38,7 +37,7 @@ struct ProcessRunnerTests {
         )
 
         #expect(result.terminationStatus.isSuccess)
-        let output = result.standardOutput?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let output = result.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(output == testString)
     }
 
@@ -58,8 +57,71 @@ struct ProcessRunnerTests {
         )
 
         #expect(result.terminationStatus.isSuccess)
-        let output = result.standardOutput?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let output = result.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(output == "test")
+    }
+
+    @available(macOS 26.0, *)
+    @Test("ProcessRunner can write a Span to standard input")
+    func testSpanInput() async throws {
+        let runner = ProcessRunner()
+        let bytes = Array("Hello, Span!".utf8)
+
+        let result = try await runner.run(
+            .name("cat"),
+            input: bytes.span,
+            output: .string(limit: 1024 * 1024)
+        )
+
+        #expect(result.terminationStatus.isSuccess)
+        #expect(result.standardOutput == "Hello, Span!")
+    }
+
+    @Test("ProcessRunner can stream standard output and standard error")
+    func testStreamingBothOutputs() async throws {
+        let runner = ProcessRunner()
+
+        let result = try await runner.run(
+            .path("/bin/sh"),
+            arguments: ["-c", "echo out; echo err >&2"],
+            input: .none,
+            output: .sequence,
+            error: .sequence
+        ) { execution in
+            async let standardOutput = execution.standardOutput.strings().reduce(into: [String]()) { $0.append($1) }
+            async let standardError = execution.standardError.strings().reduce(into: [String]()) { $0.append($1) }
+            return try await (standardOutput, standardError)
+        }
+
+        #expect(result.terminationStatus.isSuccess)
+        #expect(result.closureResult.0 == ["out"])
+        #expect(result.closureResult.1 == ["err"])
+    }
+
+    @MainActor
+    @Test("ProcessRunner body can capture non-Sendable state from the caller")
+    func testBodyRunsOnCallerActor() async throws {
+        final class Counter {
+            var value = 0
+        }
+        let runner = ProcessRunner()
+        let counter = Counter()
+
+        let result = try await runner.run(
+            .name("echo"),
+            arguments: ["hello"],
+            input: .none,
+            output: .sequence,
+            error: .discarded
+        ) { execution in
+            for try await _ in execution.standardOutput {
+                counter.value += 1
+            }
+            return counter.value
+        }
+
+        #expect(result.terminationStatus.isSuccess)
+        #expect(result.closureResult > 0)
     }
 }
 
@@ -80,84 +142,82 @@ struct ProcessRunningProtocolTests {
 
         func run<Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
             _ executable: Executable,
-            arguments: Arguments = [],
-            environment: Environment = .inherit,
-            workingDirectory: FilePath? = nil,
-            platformOptions: PlatformOptions = PlatformOptions(),
-            input: Input = .none,
+            arguments: Arguments,
+            environment: Environment,
+            workingDirectory: FilePath?,
+            platformOptions: PlatformOptions,
+            input: Input,
             output: Output,
-            error: Error = .discarded
-        ) async throws -> any CollectedResultProtocol<Output, Error> {
+            error: Error
+        ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
             recordCall(executable, arguments)
-            // Use actual Subprocess.run to get a real CollectedResult
-            // This is acceptable for a mock that needs to return the protocol type
-            return MockCollectedResult(
+            guard
+                let standardOutput = () as? Output.OutputType,
+                let standardError = () as? Error.OutputType
+            else {
+                fatalError("MockProcessRunner only supports outputs whose OutputType is Void")
+            }
+            return MockExecutionResult<Void, Output, Error>(
                 processIdentifier: .init(value: 0),
-                terminationStatus: .exited(0)
+                terminationStatus: .exited(0),
+                standardOutput: standardOutput,
+                standardError: standardError,
+                closureResult: ()
             )
         }
 
-        func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+        nonisolated(nonsending) func run<InputElement: BitwiseCopyable, Output: OutputProtocol, Error: ErrorOutputProtocol>(
             _ executable: Executable,
-            arguments: Arguments = [],
-            environment: Environment = .inherit,
-            workingDirectory: FilePath? = nil,
-            platformOptions: PlatformOptions = PlatformOptions(),
-            input: Input = .none,
-            output: Output = .discarded,
-            error: Error = .discarded,
-            isolation: isolated (any Actor)? = #isolation,
-            body: ((Execution) async throws -> Result)
-        ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
+            arguments: Arguments,
+            environment: Environment,
+            workingDirectory: FilePath?,
+            platformOptions: PlatformOptions,
+            input: borrowing Span<InputElement>,
+            output: Output,
+            error: Error
+        ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
+            fatalError("MockProcessRunner.run with Span input is not implemented")
+        }
+
+        nonisolated(nonsending) func run<Result: Sendable, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+            _ executable: Executable,
+            arguments: Arguments,
+            environment: Environment,
+            workingDirectory: FilePath?,
+            platformOptions: PlatformOptions,
+            input: Input,
+            output: Output,
+            error: Error,
+            body: nonisolated(nonsending) (Execution<Input, Output, Error>) async throws -> Result
+        ) async throws -> any ExecutionResultProtocol<Result, Output, Error> {
             fatalError("MockProcessRunner.run with Execution body is not implemented")
         }
 
-        func run<Result, Input: InputProtocol, Error: ErrorOutputProtocol>(
-            _ executable: Executable,
-            arguments: Arguments = [],
-            environment: Environment = .inherit,
-            workingDirectory: FilePath? = nil,
-            platformOptions: PlatformOptions = PlatformOptions(),
-            input: Input = .none,
-            error: Error = .discarded,
-            preferredBufferSize: Int? = nil,
-            isolation: isolated (any Actor)? = #isolation,
-            body: ((Execution, AsyncBufferSequence) async throws -> Result)
-        ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
-            fatalError("MockProcessRunner.run with AsyncBufferSequence body is not implemented")
-        }
-
-        func run<Result, Error: ErrorOutputProtocol>(
-            _ executable: Executable,
-            arguments: Arguments = [],
-            environment: Environment = .inherit,
-            workingDirectory: FilePath? = nil,
-            platformOptions: PlatformOptions = PlatformOptions(),
-            error: Error = .discarded,
-            preferredBufferSize: Int? = nil,
-            isolation: isolated (any Actor)? = #isolation,
-            body: ((Execution, StandardInputWriter, AsyncBufferSequence) async throws -> Result)
-        ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
-            fatalError("MockProcessRunner.run with StandardInputWriter body is not implemented")
+        nonisolated(nonsending) func run<InputElement: BitwiseCopyable, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+            _ configuration: Configuration,
+            input: borrowing Span<InputElement>,
+            output: Output,
+            error: Error
+        ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
+            fatalError("MockProcessRunner.run with Configuration and Span input is not implemented")
         }
 
         func run<Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
             _ configuration: Configuration,
-            input: Input = .none,
+            input: Input,
             output: Output,
-            error: Error = .discarded
-        ) async throws -> any CollectedResultProtocol<Output, Error> {
-            fatalError("MockProcessRunner.run with Configuration, Input, and Output body is not implemented")
+            error: Error
+        ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
+            fatalError("MockProcessRunner.run with Configuration is not implemented")
         }
 
-        func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+        nonisolated(nonsending) func run<Result: Sendable, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
             _ configuration: Configuration,
-            input: Input = .none,
-            output: Output = .discarded,
-            error: Error = .discarded,
-            isolation: isolated (any Actor)? = #isolation,
-            body: ((Execution) async throws -> Result)
-        ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
+            input: Input,
+            output: Output,
+            error: Error,
+            body: nonisolated(nonsending) (Execution<Input, Output, Error>) async throws -> Result
+        ) async throws -> any ExecutionResultProtocol<Result, Output, Error> {
             fatalError("MockProcessRunner.run with Configuration and Execution body is not implemented")
         }
     }

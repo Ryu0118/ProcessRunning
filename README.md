@@ -7,12 +7,12 @@ swift-subprocess provides a great API for running subprocesses, but it's not eas
 ## Requirements
 
 - macOS 13.0+
-- Swift 6.2+
+- Swift 6.3+ (Xcode 26.4 or newer), matching the toolchains swift-subprocess 1.0 is tested with
 
 ## Installation
 
 ```swift
-.package(url: "https://github.com/Ryu0118/ProcessRunning.git", from: "0.1.0")
+.package(url: "https://github.com/Ryu0118/ProcessRunning.git", from: "0.3.0")
 ```
 
 ## Usage
@@ -34,7 +34,29 @@ let result = try await runner.run(
 print(result.standardOutput)
 ```
 
-The API matches swift-subprocess, so you can use all the same input/output types, execution modes, and configuration options. See the [swift-subprocess documentation](https://github.com/swiftlang/swift-subprocess) for details.
+### Streaming
+
+Pass `.sequence` to stream standard output and standard error from the closure:
+
+```swift
+let result = try await runner.run(
+    .name("swift"),
+    arguments: ["build"],
+    input: .none,
+    output: .sequence,
+    error: .sequence
+) { execution in
+    async let output: Void = {
+        for try await line in execution.standardOutput.strings() { print(line) }
+    }()
+    async let error: Void = {
+        for try await line in execution.standardError.strings() { print(line) }
+    }()
+    _ = try await (output, error)
+}
+```
+
+The API matches swift-subprocess 1.0, so you can use all the same input/output types, execution modes, and configuration options. See the [swift-subprocess documentation](https://github.com/swiftlang/swift-subprocess) for details.
 
 ### Dependency Injection
 
@@ -59,3 +81,7 @@ let service = MyService(processRunner: ProcessRunner())
 // Test code
 let service = MyService(processRunner: MockProcessRunner())
 ```
+
+Results are returned as `any ExecutionResultProtocol<ClosureResult, Output, Error>`, which mirrors `Subprocess.ExecutionResult`, so mocks can return their own result types.
+
+Closures passed as `body` are `nonisolated(nonsending)`, as in swift-subprocess. When a mock implements a `body` requirement, spell the parameter type as `nonisolated(nonsending) (Execution<Input, Output, Error>) async throws -> Result`.

@@ -7,32 +7,29 @@ import System
 import SystemPackage
 #endif
 
-struct MockCollectedResult<Output: OutputProtocol, Error: OutputProtocol>: CollectedResultProtocol, Sendable
+struct MockExecutionResult<ClosureResult: Sendable, Output: OutputProtocol, Error: OutputProtocol>: ExecutionResultProtocol, Sendable
 where Output.OutputType: Sendable, Error.OutputType: Sendable {
     let processIdentifier: ProcessIdentifier
     let terminationStatus: TerminationStatus
-    var standardOutput: Output.OutputType {
-        preconditionFailure()
-    }
-    var standardError: Error.OutputType {
-        preconditionFailure()
-    }
+    let standardOutput: Output.OutputType
+    let standardError: Error.OutputType
+    let value: ClosureResult
 
     init(
         processIdentifier: ProcessIdentifier,
-        terminationStatus: TerminationStatus
+        terminationStatus: TerminationStatus,
+        standardOutput: Output.OutputType,
+        standardError: Error.OutputType,
+        closureResult: ClosureResult
     ) {
         self.processIdentifier = processIdentifier
         self.terminationStatus = terminationStatus
+        self.standardOutput = standardOutput
+        self.standardError = standardError
+        self.value = closureResult
     }
-}
 
-struct MockExecutionResult<Result>: ExecutionResultProtocol, Sendable where Result: Sendable {
-    let terminationStatus: TerminationStatus
-    let value: Result
-
-    init(terminationStatus: TerminationStatus, value: Result) {
-        self.terminationStatus = terminationStatus
-        self.value = value
+    consuming func takeClosureResult() -> ClosureResult {
+        value
     }
 }
