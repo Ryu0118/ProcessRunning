@@ -16,7 +16,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.2.1")
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -25,6 +25,10 @@ let package = Package(
             name: "ProcessRunning",
             dependencies: [
                 .product(name: "Subprocess", package: "swift-subprocess")
+            ],
+            swiftSettings: [
+                // Match Subprocess so `run` and `body` stay on the caller's actor.
+                .enableUpcomingFeature("NonisolatedNonsendingByDefault")
             ]
         ),
         .testTarget(

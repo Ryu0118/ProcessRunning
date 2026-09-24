@@ -18,7 +18,7 @@ public struct ProcessRunner: ProcessRunning {
         input: Input = .none,
         output: Output,
         error: Error = .discarded
-    ) async throws -> any CollectedResultProtocol<Output, Error> {
+    ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
         try await Subprocess.run(
             executable,
             arguments: arguments,
@@ -31,18 +31,39 @@ public struct ProcessRunner: ProcessRunning {
         )
     }
 
-    public func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+    public func run<InputElement: BitwiseCopyable, Output: OutputProtocol, Error: ErrorOutputProtocol>(
         _ executable: Executable,
         arguments: Arguments = [],
         environment: Environment = .inherit,
         workingDirectory: FilePath? = nil,
         platformOptions: PlatformOptions = PlatformOptions(),
-        input: Input = .none,
-        output: Output = .discarded,
-        error: Error = .discarded,
-        isolation: isolated (any Actor)? = #isolation,
-        body: ((Execution) async throws -> Result)
-    ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
+        input: borrowing Span<InputElement>,
+        output: Output,
+        error: Error = .discarded
+    ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
+        try await Subprocess.run(
+            executable,
+            arguments: arguments,
+            environment: environment,
+            workingDirectory: workingDirectory,
+            platformOptions: platformOptions,
+            input: input,
+            output: output,
+            error: error
+        )
+    }
+
+    public func run<Result: Sendable, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+        _ executable: Executable,
+        arguments: Arguments = [],
+        environment: Environment = .inherit,
+        workingDirectory: FilePath? = nil,
+        platformOptions: PlatformOptions = PlatformOptions(),
+        input: Input,
+        output: Output,
+        error: Error,
+        body: (Execution<Input, Output, Error>) async throws -> Result
+    ) async throws -> any ExecutionResultProtocol<Result, Output, Error> {
         try await Subprocess.run(
             executable,
             arguments: arguments,
@@ -52,58 +73,21 @@ public struct ProcessRunner: ProcessRunning {
             input: input,
             output: output,
             error: error,
-            isolation: isolation,
             body: body
         )
     }
 
-    public func run<Result, Input: InputProtocol, Error: ErrorOutputProtocol>(
-        _ executable: Executable,
-        arguments: Arguments = [],
-        environment: Environment = .inherit,
-        workingDirectory: FilePath? = nil,
-        platformOptions: PlatformOptions = PlatformOptions(),
-        input: Input = .none,
-        error: Error = .discarded,
-        preferredBufferSize: Int? = nil,
-        isolation: isolated (any Actor)? = #isolation,
-        body: ((Execution, AsyncBufferSequence) async throws -> Result)
-    ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
+    public func run<InputElement: BitwiseCopyable, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+        _ configuration: Configuration,
+        input: borrowing Span<InputElement>,
+        output: Output,
+        error: Error = .discarded
+    ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
         try await Subprocess.run(
-            executable,
-            arguments: arguments,
-            environment: environment,
-            workingDirectory: workingDirectory,
-            platformOptions: platformOptions,
+            configuration,
             input: input,
-            error: error,
-            preferredBufferSize: preferredBufferSize,
-            isolation: isolation,
-            body: body
-        )
-    }
-
-    public func run<Result, Error: ErrorOutputProtocol>(
-        _ executable: Executable,
-        arguments: Arguments = [],
-        environment: Environment = .inherit,
-        workingDirectory: FilePath? = nil,
-        platformOptions: PlatformOptions = PlatformOptions(),
-        error: Error = .discarded,
-        preferredBufferSize: Int? = nil,
-        isolation: isolated (any Actor)? = #isolation,
-        body: ((Execution, StandardInputWriter, AsyncBufferSequence) async throws -> Result)
-    ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
-        try await Subprocess.run(
-            executable,
-            arguments: arguments,
-            environment: environment,
-            workingDirectory: workingDirectory,
-            platformOptions: platformOptions,
-            error: error,
-            preferredBufferSize: preferredBufferSize,
-            isolation: isolation,
-            body: body
+            output: output,
+            error: error
         )
     }
 
@@ -112,7 +96,7 @@ public struct ProcessRunner: ProcessRunning {
         input: Input = .none,
         output: Output,
         error: Error = .discarded
-    ) async throws -> any CollectedResultProtocol<Output, Error> {
+    ) async throws -> any ExecutionResultProtocol<Void, Output, Error> {
         try await Subprocess.run(
             configuration,
             input: input,
@@ -121,20 +105,18 @@ public struct ProcessRunner: ProcessRunning {
         )
     }
 
-    public func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
+    public func run<Result: Sendable, Input: InputProtocol, Output: OutputProtocol, Error: ErrorOutputProtocol>(
         _ configuration: Configuration,
-        input: Input = .none,
-        output: Output = .discarded,
-        error: Error = .discarded,
-        isolation: isolated (any Actor)? = #isolation,
-        body: ((Execution) async throws -> Result)
-    ) async throws -> any ExecutionResultProtocol<Result> where Error.OutputType == Void {
+        input: Input,
+        output: Output,
+        error: Error,
+        body: (Execution<Input, Output, Error>) async throws -> Result
+    ) async throws -> any ExecutionResultProtocol<Result, Output, Error> {
         try await Subprocess.run(
             configuration,
             input: input,
             output: output,
             error: error,
-            isolation: isolation,
             body: body
         )
     }
