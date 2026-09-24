@@ -7,7 +7,7 @@ swift-subprocess provides a great API for running subprocesses, but it's not eas
 ## Requirements
 
 - macOS 13.0+
-- Swift 6.2+
+- Swift 6.3+ (Xcode 26.4 or newer), matching the toolchains swift-subprocess 1.0 is tested with
 
 ## Installation
 

@@ -21,14 +21,20 @@ jobs:
     strategy:
       fail-fast: false    
       matrix:
-        os: [macos-15]
+        os: [macos-26]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 26.1
-        run: sudo xcode-select -s /Applications/Xcode_26.1.app
-        
+      # swift-subprocess 1.0 is tested upstream with Swift 6.3+; older SDKs reject its Span-based APIs.
+      - name: Select the latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show toolchain
+        run: swift --version
+
       - name: Test
         run: swift test
